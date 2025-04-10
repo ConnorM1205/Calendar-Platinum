@@ -9,13 +9,15 @@ public class CalendarEvent {
     private final LocalTime time;
     private final String description;
     private final String location;
+    private final ClassCourse course;
 
-    public CalendarEvent(String title, LocalDate date, LocalTime time, String description, String location) {
+    public CalendarEvent(String title, LocalDate date, LocalTime time, String description, String location, ClassCourse course) {
         this.title = title;
         this.date = date;
         this.time = time;
         this.description = description;
         this.location = location;
+        this.course = course;
     }
 
     public String getTitle() {
@@ -37,4 +39,6 @@ public class CalendarEvent {
     public String getLocation() {
         return location;
     }
+
+    public ClassCourse getCourse() {return course;}
 }

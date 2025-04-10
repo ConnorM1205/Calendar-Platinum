@@ -18,6 +18,8 @@ public class CalendarEditor extends JFrame {
     private int currentYear, currentMonth;
     private final Map<String, List<CalendarEvent>> events = new HashMap<>();
     private DefaultListModel<String> eventListModel;  // Add this as a class field
+    private final List<ClassCourse> classes = new ArrayList<>();
+
 
     public CalendarEditor() {
         setSize(400, 300);
@@ -170,7 +172,7 @@ public class CalendarEditor extends JFrame {
         prevButton.addActionListener(e -> changeMonth(-1));
         nextButton.addActionListener(e -> changeMonth(1));
         homeButton.addActionListener(e -> cardLayout.show(mainPanel, "Home"));
-
+        classButton.addActionListener(e -> createClass());
         // Layout for Calendar Page
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -231,13 +233,53 @@ public class CalendarEditor extends JFrame {
         calendarPanel.revalidate();
         calendarPanel.repaint();
     }
+
+    private void createClass() {
+        Color[] colors = {Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.ORANGE, Color.cyan, Color.magenta, Color.PINK};
+        String[] ColorNames = {"Red", "Green", "Blue", "Yellow", "Orange", "Cyan", "Magenta", "Pink"};
+        JTextField nameField = new JTextField(15);
+        JTextField instructorTextField = new JTextField(15);
+        JTextField locationTextField = new JTextField(15);
+        JComboBox<Color> colorBox = new JComboBox<>(colors);        JPanel panel = new JPanel(new GridLayout(0,1));
+
+
+
+        panel.add(new JLabel("Class: "));
+        panel.add(nameField);
+        panel.add(new JLabel("Instructor: "));
+        panel.add(instructorTextField);
+        panel.add(new JLabel("Room #: "));
+        panel.add(locationTextField);
+        panel.add(new JLabel("Color: "));
+        panel.add(colorBox, BorderLayout.CENTER);
+
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                panel,
+                "Create New Class",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (result == JOptionPane.OK_OPTION) {
+            String name = nameField.getText().trim();
+            String instructor = instructorTextField.getText().trim();
+            String location = locationTextField.getText().trim();
+
+            ClassCourse newClass = new ClassCourse(name, Color.CYAN, instructor, location); // You can let users pick color later
+            classes.add(newClass);
+            JOptionPane.showMessageDialog(this, "Class \"" + name + "\" created.");
+        }
+    }
+
 private void updateTaskList() {
     eventListModel.clear();
 
 
     LocalDate today = LocalDate.now();
     LocalDate startOfWeek = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday of current week
-    LocalDate endOfWeek = startOfWeek.plusDays(6); // Sunday of current week
+    LocalDate endOfWeek = today.plusDays(6); // Sunday of current week
 
     // Add all events to the list
     for (Map.Entry<String, List<CalendarEvent>> entry : events.entrySet()) {
@@ -246,16 +288,19 @@ private void updateTaskList() {
             LocalDate eventDate = event.getDate();
 
             // Check if the event is within the current week (inclusive of start and end dates)
-            if ((eventDate.isEqual(startOfWeek) || eventDate.isAfter(startOfWeek)) &&
+            if ((eventDate.isEqual(today) || eventDate.isAfter(today)) &&
                     (eventDate.isEqual(endOfWeek) || eventDate.isBefore(endOfWeek))) {
 
                 // Format the display to include the date
                 String formattedDate = eventDate.format(DateTimeFormatter.ofPattern("MM/dd"));
-                eventListModel.addElement(formattedDate + " - " + event.getTitle());
+                eventListModel.addElement(formattedDate + ": " + event.getTitle() + " - " + event.getTime());
             }
         }
     }
 }
+
+
+
 private void showEventDialog(int day, int month, int year) {
     LocalDate date = LocalDate.of(year, month + 1, day);
 
@@ -264,6 +309,7 @@ private void showEventDialog(int day, int month, int year) {
     JTextField timeField = new JTextField("HH:mm", 5);
     JTextField descriptionField = new JTextField(20);
     JTextField locationField = new JTextField(15);
+    JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
 
     // Layout panel
     JPanel panel = new JPanel(new GridLayout(0, 1));
@@ -275,6 +321,8 @@ private void showEventDialog(int day, int month, int year) {
     panel.add(descriptionField);
     panel.add(new JLabel("Location:"));
     panel.add(locationField);
+    panel.add(new JLabel("Class:"));
+    panel.add(classBox);
 
     int result = JOptionPane.showConfirmDialog(
             null,
@@ -292,7 +340,8 @@ private void showEventDialog(int day, int month, int year) {
             String location = locationField.getText().trim();
 
             // Create new event and add it to the map
-            CalendarEvent newEvent = new CalendarEvent(title, date, time, description, location);
+            ClassCourse selectedClass = (ClassCourse) classBox.getSelectedItem();
+            CalendarEvent newEvent = new CalendarEvent(title, date, time, description, location, selectedClass);
             events.computeIfAbsent(date.toString(), k -> new ArrayList<>()).add(newEvent);
             JOptionPane.showMessageDialog(null, "Event added successfully!");
             updateCalendar(currentYear, currentMonth);
@@ -321,7 +370,7 @@ private void showEventDialog(int day, int month, int year) {
         // Loop through all the events for the given day and add their titles to the string
         for (CalendarEvent event : eventList) {
             // Assuming there's a 'title' property or field in the CalendarEvent class
-            eventDetails.append("<font size='2'>").append(event.getTitle()).append("</font><br>");
+            eventDetails.append("<font size='2'><font color = \"red\">").append(event.getTitle()).append("</font><br>");
         }
 
         eventDetails.append("</center></html>");
