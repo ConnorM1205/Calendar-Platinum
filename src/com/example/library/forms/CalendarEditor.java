@@ -1,4 +1,3 @@
-
 package com.example.library.forms;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -20,14 +19,37 @@ public class CalendarEditor extends JFrame {
     private DefaultListModel<String> eventListModel;  // Add this as a class field
     private final List<ClassCourse> classes = new ArrayList<>();
 
+    //user database: (SHIBUYA
+    private final Map<String, String> userDatabase = new HashMap<>();
+    //(SHIBUYA
+    private boolean isLoggedIn = false;
+    //(SHIBUYA
+    private JButton goToCalendarButton;
+
 
     public CalendarEditor() {
+        userDatabase.put("CS370", "7");   //default user
         setSize(400, 300);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
+
+        //login panel (SHIBUYA
+        CalendarLogin loginPanel = new CalendarLogin(userDatabase, new CalendarLogin.LoginListener() {
+
+            public void onLoginSuccess() {
+                isLoggedIn = true;
+                goToCalendarButton.setEnabled(true);
+                cardLayout.show(mainPanel, "Calendar");
+            }
+
+        });
+
+        //login panel on main(SHIBUYA
+        mainPanel.add(loginPanel, "Login");
+
 
         JPanel homePanel = createHomePanel();
 
@@ -54,9 +76,27 @@ public class CalendarEditor extends JFrame {
         JLabel homeLabel = new JLabel("Canvas Platinum", SwingConstants.CENTER);
         homeLabel.setFont(new Font("Montserrat", Font.BOLD, 20));
 
+
         // --- Calendar Button ---
-        JButton goToCalendarButton = new JButton("View Calendar");
-        goToCalendarButton.addActionListener(e -> cardLayout.show(mainPanel, "Calendar"));
+        //can't view calendar before login (SHIBUYA)
+        goToCalendarButton = new JButton("View Calendar");
+        goToCalendarButton.setEnabled(false);
+        goToCalendarButton.addActionListener(e -> {
+            if (isLoggedIn) {
+                cardLayout.show(mainPanel, "Calendar");
+            } else {
+                JOptionPane.showMessageDialog(null, "Please log in first.");
+                cardLayout.show(mainPanel, "Login");
+            }
+        });
+
+        //login(SHIBUYA
+        JButton loginButton = new JButton("Login");
+        loginButton.addActionListener(e -> cardLayout.show(mainPanel, "Login"));
+//register(SHIBUYA
+        JButton registerButton = new JButton("Register");
+        registerButton.addActionListener(e -> cardLayout.show(mainPanel, "Login"));
+
 
         // --- Task List ---
         eventListModel = new DefaultListModel<>();  // Initialize the class field
@@ -83,11 +123,20 @@ public class CalendarEditor extends JFrame {
         centerPanel.add(Box.createVerticalStrut(10));
         centerPanel.add(goToCalendarButton);
 
+        //login, register Panel and button (SHIBUYA)
+        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(loginButton);
+        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(registerButton);
+
+
         c.insets = new Insets(20, 20, 20, 20);
         c.gridx = 0;
         c.gridy = 0;
         c.anchor = GridBagConstraints.CENTER;
         homePanel.add(centerPanel, c);
+
+
 
         // --- Right-aligned task list ---
         JPanel taskPanel = new JPanel();
@@ -123,7 +172,7 @@ public class CalendarEditor extends JFrame {
         JButton prevButton = new JButton("<");
         JButton nextButton = new JButton(">");
         JButton classButton = new JButton("Create Class");
-        JButton loginButton = new JButton("Login");
+        JButton logoutButton = new JButton("Logout");
         JButton homeButton = new JButton("Home");
 
         monthLabel = new JLabel("Month");
@@ -155,7 +204,7 @@ public class CalendarEditor extends JFrame {
         headerGbc.gridx = 4;
         headerGbc.anchor = GridBagConstraints.EAST;
         headerGbc.weightx = 1.0;
-        headerPanel.add(loginButton, headerGbc);
+        headerPanel.add(logoutButton, headerGbc);
 
         headerGbc.gridx = 5;
         headerGbc.anchor = GridBagConstraints.EAST;
@@ -173,6 +222,12 @@ public class CalendarEditor extends JFrame {
         nextButton.addActionListener(e -> changeMonth(1));
         homeButton.addActionListener(e -> cardLayout.show(mainPanel, "Home"));
         classButton.addActionListener(e -> createClass());
+        //logout (SHIBUYA
+        logoutButton.addActionListener(e -> {
+            isLoggedIn = false;
+            goToCalendarButton.setEnabled(false);
+            cardLayout.show(mainPanel, "Home");
+        });
         // Layout for Calendar Page
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -273,84 +328,84 @@ public class CalendarEditor extends JFrame {
         }
     }
 
-private void updateTaskList() {
-    eventListModel.clear();
+    private void updateTaskList() {
+        eventListModel.clear();
 
 
-    LocalDate today = LocalDate.now();
-    LocalDate startOfWeek = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday of current week
-    LocalDate endOfWeek = today.plusDays(6); // Sunday of current week
+        LocalDate today = LocalDate.now();
+        LocalDate startOfWeek = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday of current week
+        LocalDate endOfWeek = today.plusDays(6); // Sunday of current week
 
-    // Add all events to the list
-    for (Map.Entry<String, List<CalendarEvent>> entry : events.entrySet()) {
-        List<CalendarEvent> eventList = entry.getValue();
-        for (CalendarEvent event : eventList) {
-            LocalDate eventDate = event.getDate();
+        // Add all events to the list
+        for (Map.Entry<String, List<CalendarEvent>> entry : events.entrySet()) {
+            List<CalendarEvent> eventList = entry.getValue();
+            for (CalendarEvent event : eventList) {
+                LocalDate eventDate = event.getDate();
 
-            // Check if the event is within the current week (inclusive of start and end dates)
-            if ((eventDate.isEqual(today) || eventDate.isAfter(today)) &&
-                    (eventDate.isEqual(endOfWeek) || eventDate.isBefore(endOfWeek))) {
+                // Check if the event is within the current week (inclusive of start and end dates)
+                if ((eventDate.isEqual(today) || eventDate.isAfter(today)) &&
+                        (eventDate.isEqual(endOfWeek) || eventDate.isBefore(endOfWeek))) {
 
-                // Format the display to include the date
-                String formattedDate = eventDate.format(DateTimeFormatter.ofPattern("MM/dd"));
-                eventListModel.addElement(formattedDate + ": " + event.getTitle() + " - " + event.getTime());
+                    // Format the display to include the date
+                    String formattedDate = eventDate.format(DateTimeFormatter.ofPattern("MM/dd"));
+                    eventListModel.addElement(formattedDate + ": " + event.getTitle() + " - " + event.getTime());
+                }
             }
         }
     }
-}
 
 
 
-private void showEventDialog(int day, int month, int year) {
-    LocalDate date = LocalDate.of(year, month + 1, day);
+    private void showEventDialog(int day, int month, int year) {
+        LocalDate date = LocalDate.of(year, month + 1, day);
 
-    // Create the input fields
-    JTextField titleField = new JTextField(15);
-    JTextField timeField = new JTextField("HH:mm", 5);
-    JTextField descriptionField = new JTextField(20);
-    JTextField locationField = new JTextField(15);
-    JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
+        // Create the input fields
+        JTextField titleField = new JTextField(15);
+        JTextField timeField = new JTextField("HH:mm", 5);
+        JTextField descriptionField = new JTextField(20);
+        JTextField locationField = new JTextField(15);
+        JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
 
-    // Layout panel
-    JPanel panel = new JPanel(new GridLayout(0, 1));
-    panel.add(new JLabel("Title:"));
-    panel.add(titleField);
-    panel.add(new JLabel("Time (HH:mm):"));
-    panel.add(timeField);
-    panel.add(new JLabel("Description:"));
-    panel.add(descriptionField);
-    panel.add(new JLabel("Location:"));
-    panel.add(locationField);
-    panel.add(new JLabel("Class:"));
-    panel.add(classBox);
+        // Layout panel
+        JPanel panel = new JPanel(new GridLayout(0, 1));
+        panel.add(new JLabel("Title:"));
+        panel.add(titleField);
+        panel.add(new JLabel("Time (HH:mm):"));
+        panel.add(timeField);
+        panel.add(new JLabel("Description:"));
+        panel.add(descriptionField);
+        panel.add(new JLabel("Location:"));
+        panel.add(locationField);
+        panel.add(new JLabel("Class:"));
+        panel.add(classBox);
 
-    int result = JOptionPane.showConfirmDialog(
-            null,
-            panel,
-            "Add Event for " + date.format(DateTimeFormatter.ofPattern("MM/dd/yyyy")),
-            JOptionPane.OK_CANCEL_OPTION,
-            JOptionPane.PLAIN_MESSAGE
-    );
+        int result = JOptionPane.showConfirmDialog(
+                null,
+                panel,
+                "Add Event for " + date.format(DateTimeFormatter.ofPattern("MM/dd/yyyy")),
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+        );
 
-    if (result == JOptionPane.OK_OPTION) {
-        try {
-            String title = titleField.getText().trim();
-            LocalTime time = LocalTime.parse(timeField.getText().trim());
-            String description = descriptionField.getText().trim();
-            String location = locationField.getText().trim();
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                String title = titleField.getText().trim();
+                LocalTime time = LocalTime.parse(timeField.getText().trim());
+                String description = descriptionField.getText().trim();
+                String location = locationField.getText().trim();
 
-            // Create new event and add it to the map
-            ClassCourse selectedClass = (ClassCourse) classBox.getSelectedItem();
-            CalendarEvent newEvent = new CalendarEvent(title, date, time, description, location, selectedClass);
-            events.computeIfAbsent(date.toString(), k -> new ArrayList<>()).add(newEvent);
-            JOptionPane.showMessageDialog(null, "Event added successfully!");
-            updateCalendar(currentYear, currentMonth);
-            updateTaskList();
-        } catch (DateTimeParseException e) {
-            JOptionPane.showMessageDialog(null, "Invalid time format. Please use HH:mm.", "Error", JOptionPane.ERROR_MESSAGE);
+                // Create new event and add it to the map
+                ClassCourse selectedClass = (ClassCourse) classBox.getSelectedItem();
+                CalendarEvent newEvent = new CalendarEvent(title, date, time, description, location, selectedClass);
+                events.computeIfAbsent(date.toString(), k -> new ArrayList<>()).add(newEvent);
+                JOptionPane.showMessageDialog(null, "Event added successfully!");
+                updateCalendar(currentYear, currentMonth);
+                updateTaskList();
+            } catch (DateTimeParseException e) {
+                JOptionPane.showMessageDialog(null, "Invalid time format. Please use HH:mm.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
-}
 
 
 
