@@ -269,21 +269,74 @@ public class CalendarEditor extends JFrame {
 
 
 
+        // for (int day = 1; day <= daysInMonth; day++) {
+        //     JButton dayButton = new JButton(String.valueOf(day));
+        //     dayButton.setFont(new Font("Arial", Font.PLAIN, 14));
+        //     dayButton.setBackground(Color.WHITE);
+
+        //     // Update button text with event details if available
+        //     String key = LocalDate.of(year, month + 1, day).toString();
+        //     dayButton.setText(getButtonText(day, key));
+
+        //     // Handle day button click
+        //     int finalDay = day;
+        //     dayButton.addActionListener(e -> showEventDialog(finalDay, month, year));
+        //     calendarPanel.add(dayButton);
+        // }
+        //AYDAN: Altered this - APR 9
         for (int day = 1; day <= daysInMonth; day++) {
+            JPanel dayCell = new JPanel(new BorderLayout());
+            dayCell.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+            dayCell.setBackground(Color.WHITE);
+
+            LocalDate date = LocalDate.of(year, month + 1, day);
+            boolean isToday = date.equals(LocalDate.now());
+            boolean hasEvents = events.containsKey(date.toString());
+
+            // ---- Day Button ----
             JButton dayButton = new JButton(String.valueOf(day));
             dayButton.setFont(new Font("Arial", Font.PLAIN, 14));
-            dayButton.setBackground(Color.WHITE);
+            dayButton.setFocusPainted(false);
+            dayButton.setContentAreaFilled(false);
+            dayButton.setBorderPainted(false);
 
-            // Update button text with event details if available
-            String key = LocalDate.of(year, month + 1, day).toString();
-            dayButton.setText(getButtonText(day, key));
+            if (hasEvents) {
+                dayButton.setForeground(Color.BLUE); //Blue text
+                dayCell.setBorder(BorderFactory.createLineBorder(Color.BLUE, 2)); //Add blue border
+            }
 
-            // Handle day button click
+
+            if (isToday) {
+                dayCell.setBackground(new Color(220, 220, 220)); // Light gray background for today
+            }
+
             int finalDay = day;
-            dayButton.addActionListener(e -> showEventDialog(finalDay, month, year));
-            calendarPanel.add(dayButton);
-        }
+            dayButton.addActionListener(e -> showEventsForDay(finalDay, month, year));
 
+            // ---- Add Button (+) ----
+            JButton addButton = new JButton("+");
+            addButton.setMargin(new Insets(0, 0, 0, 0));
+            addButton.setFont(new Font("Arial", Font.PLAIN, 10));
+            addButton.setPreferredSize(new Dimension(20, 20));
+            addButton.setFocusPainted(false);
+            addButton.addActionListener(e -> showEventDialog(finalDay, month, year));
+
+            JPanel topRightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+            topRightPanel.setOpaque(false);
+            topRightPanel.add(addButton);
+
+            // ---- Optional Calendar Icon for Event Days ----
+            if (hasEvents) {
+                JLabel iconLabel = new JLabel("📅", SwingConstants.CENTER);
+                iconLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+                iconLabel.setHorizontalAlignment(SwingConstants.CENTER);
+                dayCell.add(iconLabel, BorderLayout.SOUTH);
+            }
+
+            dayCell.add(topRightPanel, BorderLayout.NORTH);
+            dayCell.add(dayButton, BorderLayout.CENTER);
+            calendarPanel.add(dayCell);
+        }
 
         calendarPanel.revalidate();
         calendarPanel.repaint();
@@ -328,30 +381,99 @@ public class CalendarEditor extends JFrame {
         }
     }
 
+    //AYDAN: added this func. - APR 9
+    private void showEventsForDay(int day, int month, int year) {
+        LocalDate date = LocalDate.of(year, month + 1, day);
+        List<CalendarEvent> eventList = events.getOrDefault(date.toString(), new ArrayList<>());
+
+        if (eventList.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No events for " + date);
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (CalendarEvent event : eventList) {
+            sb.append("Title: ").append(event.getTitle()).append("\n");
+            sb.append("Time: ").append(event.getTime()).append("\n");
+            sb.append("Location: ").append(event.getLocation()).append("\n");
+            sb.append("Description: ").append(event.getDescription()).append("\n\n");
+        }
+
+        JTextArea textArea = new JTextArea(sb.toString());
+        textArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(400, 300));
+
+        JOptionPane.showMessageDialog(this, scrollPane, "Events on " + date, JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    // private void updateTaskList() {
+    //     eventListModel.clear();
+
+
+    //     LocalDate today = LocalDate.now();
+    //     LocalDate startOfWeek = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday of current week
+    //     LocalDate endOfWeek = today.plusDays(6); // Sunday of current week
+
+    //     // Add all events to the list
+    //     for (Map.Entry<String, List<CalendarEvent>> entry : events.entrySet()) {
+    //         List<CalendarEvent> eventList = entry.getValue();
+    //         for (CalendarEvent event : eventList) {
+    //             LocalDate eventDate = event.getDate();
+
+    //             // Check if the event is within the current week (inclusive of start and end dates)
+    //             if ((eventDate.isEqual(today) || eventDate.isAfter(today)) &&
+    //                     (eventDate.isEqual(endOfWeek) || eventDate.isBefore(endOfWeek))) {
+
+    //                 // Format the display to include the date
+    //                 String formattedDate = eventDate.format(DateTimeFormatter.ofPattern("MM/dd"));
+    //                 eventListModel.addElement(formattedDate + ": " + event.getTitle() + " - " + event.getTime());
+    //             }
+    //         }
+    //     }
+    // }
+
     private void updateTaskList() {
+        //AYDAN: changed how home page task viewer functions, only shows upcoming tasks for future / current ACTUAL day, other tasks before are considered passed - APR 9
+
+        // LocalDate today = LocalDate.now();
+        // LocalDate startOfWeek = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday of current week
+        // LocalDate endOfWeek = startOfWeek.plusDays(6); // Sunday of current week
+
+        // // Add all events to the list
+        // for (Map.Entry<String, List<CalendarEvent>> entry : events.entrySet()) {
+        //  List<CalendarEvent> eventList = entry.getValue();
+        //     for (CalendarEvent event : eventList) {
+        //         LocalDate eventDate = event.getDate();
+
+        //         // Check if the event is within the current week (inclusive of start and end dates)
+        //         if ((eventDate.isEqual(startOfWeek) || eventDate.isAfter(startOfWeek)) &&
+        //             (eventDate.isEqual(endOfWeek) || eventDate.isBefore(endOfWeek))) {
+
         eventListModel.clear();
-
-
         LocalDate today = LocalDate.now();
-        LocalDate startOfWeek = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday of current week
-        LocalDate endOfWeek = today.plusDays(6); // Sunday of current week
 
-        // Add all events to the list
-        for (Map.Entry<String, List<CalendarEvent>> entry : events.entrySet()) {
-            List<CalendarEvent> eventList = entry.getValue();
+        //Future events into a flat list
+        List<CalendarEvent> upcomingEvents = new ArrayList<>();
+        for (List<CalendarEvent> eventList : events.values()) {
             for (CalendarEvent event : eventList) {
-                LocalDate eventDate = event.getDate();
-
-                // Check if the event is within the current week (inclusive of start and end dates)
-                if ((eventDate.isEqual(today) || eventDate.isAfter(today)) &&
-                        (eventDate.isEqual(endOfWeek) || eventDate.isBefore(endOfWeek))) {
-
-                    // Format the display to include the date
-                    String formattedDate = eventDate.format(DateTimeFormatter.ofPattern("MM/dd"));
-                    eventListModel.addElement(formattedDate + ": " + event.getTitle() + " - " + event.getTime());
+                if (!event.getDate().isBefore(today)) {
+                    upcomingEvents.add(event);
                 }
             }
         }
+        //Sort the events by date
+        upcomingEvents.sort(Comparator.comparing(CalendarEvent::getDate).thenComparing(CalendarEvent::getTime));
+
+        //Add to the list model
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd");
+        for (CalendarEvent event : upcomingEvents) {
+            String formattedDate = event.getDate().format(formatter);
+            eventListModel.addElement(formattedDate + " - " + event.getTitle());
+        }
+        // // Format the display to include the date
+        // String formattedDate = eventDate.format(DateTimeFormatter.ofPattern("MM/dd"));
+        // eventListModel.addElement(formattedDate + " - " + event.getTitle());
     }
 
 
@@ -409,28 +531,28 @@ public class CalendarEditor extends JFrame {
 
 
 
+    //AYDAN commented out for now, not needed atm - APR 9
+    // private String getButtonText(int selectedDay, String key) {
+    //     // Fetch the list of events for the given key (date)
+    //     List<CalendarEvent> eventList = events.getOrDefault(key, new ArrayList<>());
 
-    private String getButtonText(int selectedDay, String key) {
-        // Fetch the list of events for the given key (date)
-        List<CalendarEvent> eventList = events.getOrDefault(key, new ArrayList<>());
+    //     // If there are no events, return the day number only
+    //     if (eventList.isEmpty()) {
+    //         return "<html><center>" + selectedDay + "</center></html>";
+    //     }
 
-        // If there are no events, return the day number only
-        if (eventList.isEmpty()) {
-            return "<html><center>" + selectedDay + "</center></html>";
-        }
+    //     // Otherwise, build the string with event details
+    //     StringBuilder eventDetails = new StringBuilder("<html><center>" + selectedDay + "<br>");
 
-        // Otherwise, build the string with event details
-        StringBuilder eventDetails = new StringBuilder("<html><center>" + selectedDay + "<br>");
+    //     // Loop through all the events for the given day and add their titles to the string
+    //     for (CalendarEvent event : eventList) {
+    //         // Assuming there's a 'title' property or field in the CalendarEvent class
+    //         eventDetails.append("<font size='2'><font color = \"red\">").append(event.getTitle()).append("</font><br>");
+    //     }
 
-        // Loop through all the events for the given day and add their titles to the string
-        for (CalendarEvent event : eventList) {
-            // Assuming there's a 'title' property or field in the CalendarEvent class
-            eventDetails.append("<font size='2'><font color = \"red\">").append(event.getTitle()).append("</font><br>");
-        }
-
-        eventDetails.append("</center></html>");
-        return eventDetails.toString();
-    }
+    //     eventDetails.append("</center></html>");
+    //     return eventDetails.toString();
+    // }
 
 
 
