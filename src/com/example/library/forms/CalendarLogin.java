@@ -1,32 +1,35 @@
 package com.example.library.forms;
 
-
+import com.google.gson.JsonObject;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import com.google.firebase.auth.FirebaseAuth;
 
-import java.util.Map;
 
 public class CalendarLogin extends JPanel {
     private final JTextField userField;
     private final JPasswordField passField;
     private final JLabel messageLabel;
-    private final Map<String, String> userDatabase;
     private boolean isLoggedIn = false;
+
+    private static final String API_KEY = "AIzaSyA2yrLXhZrVUCvjyUmJjcGMTbPDpEiZj0E"; // 🔑 Replace this!
 
     public interface LoginListener {
         void onLoginSuccess();
     }
 
-    public CalendarLogin(Map<String, String> sharedDatabase, LoginListener listener) {
-        this.userDatabase = sharedDatabase;
-
+    public CalendarLogin(LoginListener listener) {
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        JLabel userLabel = new JLabel("Username:");
+        JLabel userLabel = new JLabel("Email:");
         JLabel passLabel = new JLabel("Password:");
         userField = new JTextField(15);
         passField = new JPasswordField(15);
@@ -54,38 +57,87 @@ public class CalendarLogin extends JPanel {
         add(messageLabel, gbc);
 
         loginButton.addActionListener(e -> {
-            String username = userField.getText();
+            String email = userField.getText();
             String password = new String(passField.getPassword());
 
-            if (userDatabase.containsKey(username) && userDatabase.get(username).equals(password)) {
+            if (firebaseLogin(email, password)) {
                 messageLabel.setText("Login successful!");
                 isLoggedIn = true;
                 listener.onLoginSuccess();
             } else {
-                messageLabel.setText("Invalid credentials.");
+                messageLabel.setText("Invalid email or password.");
             }
         });
 
         registerButton.addActionListener(e -> {
-            String username = userField.getText();
+            String email = userField.getText();
             String password = new String(passField.getPassword());
 
-            if (username.isEmpty() || password.isEmpty()) {
-                messageLabel.setText("Please enter username and password.");
-            } else if (userDatabase.containsKey(username)) {
-                messageLabel.setText("User already exists!");
-            } else {
-                userDatabase.put(username, password);
+            if (email.isEmpty() || password.isEmpty()) {
+                messageLabel.setText("Please enter email and password.");
+            } else if (firebaseRegister(email, password)) {
                 messageLabel.setText("User registered successfully.");
                 userField.setText("");
                 passField.setText("");
+            } else {
+                messageLabel.setText("Registration failed.");
             }
         });
     }
 
-
-
     public boolean isLoggedIn() {
         return isLoggedIn;
+    }
+
+    private boolean firebaseLogin(String email, String password) {
+        try {
+            URL url = new URL("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + API_KEY);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("email", email);
+            requestBody.addProperty("password", password);
+            requestBody.addProperty("returnSecureToken", true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = requestBody.toString().getBytes(StandardCharsets.UTF_8);
+                os.write(input);
+            }
+
+            int responseCode = conn.getResponseCode();
+            return responseCode == 200;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean firebaseRegister(String email, String password) {
+        try {
+            URL url = new URL("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + API_KEY);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("email", email);
+            requestBody.addProperty("password", password);
+            requestBody.addProperty("returnSecureToken", true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = requestBody.toString().getBytes(StandardCharsets.UTF_8);
+                os.write(input);
+            }
+
+            int responseCode = conn.getResponseCode();
+            return responseCode == 200;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

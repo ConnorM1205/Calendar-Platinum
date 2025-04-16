@@ -8,6 +8,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.List;
+import com.google.firebase.auth.FirebaseAuth;
 
 public class CalendarEditor extends JFrame {
     private final JPanel mainPanel;
@@ -37,12 +38,13 @@ public class CalendarEditor extends JFrame {
         mainPanel = new JPanel(cardLayout);
 
         //login panel (SHIBUYA
-        CalendarLogin loginPanel = new CalendarLogin(userDatabase, new CalendarLogin.LoginListener() {
+        CalendarLogin loginPanel = new CalendarLogin( new CalendarLogin.LoginListener() {
 
             public void onLoginSuccess() {
                 isLoggedIn = true;
                 goToCalendarButton.setEnabled(true);
                 cardLayout.show(mainPanel, "Calendar");
+
             }
 
         });
@@ -571,6 +573,7 @@ public class CalendarEditor extends JFrame {
 
 
     public static void main(String[] args) {
+        FirebaseInitializer.initialize();
         SwingUtilities.invokeLater(() -> {
             CalendarEditor frame = new CalendarEditor();
             frame.setVisible(true);
