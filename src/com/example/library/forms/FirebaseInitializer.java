@@ -9,7 +9,7 @@ public class FirebaseInitializer {
     public static void initialize() {
         try {
             // Initialize Firebase Admin SDK (this requires a service account JSON file)
-            FileInputStream serviceAccount = new FileInputStream("firebase/canvas-platinum-firebase-adminsdk-fbsvc-7005cf7416.json");
+            FileInputStream serviceAccount = new FileInputStream("/Users/connormacdonald/Desktop/firebase/canvas-platinum-firebase-adminsdk-fbsvc-7005cf7416.json");
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(com.google.auth.oauth2.GoogleCredentials.fromStream(serviceAccount))
