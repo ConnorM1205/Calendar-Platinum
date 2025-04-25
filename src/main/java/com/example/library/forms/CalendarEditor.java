@@ -50,6 +50,7 @@ import com.example.library.forms.firebase.FirebaseUserService;
 
 
 public class CalendarEditor extends JFrame {
+    private ClassManager classManager;
     private final JPanel mainPanel;
     private final CardLayout cardLayout;
     private JPanel calendarPanel;
@@ -63,12 +64,14 @@ public class CalendarEditor extends JFrame {
     private String currentUsername;
     //AYDAN - APR 23
     private JButton modifyEventButton;
-    
 
     //(SHIBUYA
     private boolean isLoggedIn = false;
     //(SHIBUYA
     private JButton goToCalendarButton;
+
+
+
 
 
     public CalendarEditor() {
@@ -120,7 +123,7 @@ public class CalendarEditor extends JFrame {
             }
         });
 
-       //login buttun
+       //login button
         JButton loginButton = new JButton("Login");
         loginButton.setPreferredSize(goToCalendarButton.getPreferredSize());
         loginButton.addActionListener(e -> CalendarLogin.showLoginDialog(username -> {
@@ -129,6 +132,7 @@ public class CalendarEditor extends JFrame {
             goToCalendarButton.setEnabled(true);
 
             classes.clear();
+            classManager = new ClassManager(this, classes, currentUsername);
             classes.addAll(FirebaseUserService.loadClasses(username));
             List<CalendarEvent> loadedEvents = FirebaseUserService.loadEvents(username, classes);
             events.clear();
@@ -137,7 +141,7 @@ public class CalendarEditor extends JFrame {
                 events.computeIfAbsent(key, k -> new ArrayList<>()).add(event);
             }
             //AYDAN - APR 23
-            modifyEventButton.setEnabled(!events.isEmpty());
+           // modifyEventButton.setEnabled(!events.isEmpty());
 
             FirebaseUserService.loadUpcomingTasks(currentUsername, eventListModel);
 
@@ -243,19 +247,25 @@ public class CalendarEditor extends JFrame {
         JButton classButton = new JButton("Create Class");
         JButton logoutButton = new JButton("Logout");
         JButton homeButton = new JButton("Home");
-        //AYDAN - APR 23
-        JButton modifyEventButton = new JButton("Modify Events");
-        modifyEventButton.setEnabled(!events.isEmpty()); //Disable if no events yet
-        modifyEventButton = new JButton("Modify Events");
-        // modifyEventButton.setEnabled(false); // initially disabled
+
+        modifyEventButton = new JButton("Modify Events"); // use class field, not local
         modifyEventButton.addActionListener(e -> openModifyEventWindow());
 
+        JButton modifyClassButton = new JButton("Modify Class");
+        modifyClassButton.addActionListener(e -> {
+            if (classManager != null) {
+                classManager.openModifyClassWindow();
+            } else {
+                JOptionPane.showMessageDialog(this, "No classes loaded yet.");
+            }
+        });
 
         monthLabel = new JLabel("Month");
 
-        // Add components to header panel
+        // --- Add components to header panel
         GridBagConstraints headerGbc = new GridBagConstraints();
         headerGbc.insets = new Insets(5, 5, 5, 5);
+
         headerGbc.gridx = 0;
         headerGbc.gridy = 0;
         headerGbc.anchor = GridBagConstraints.WEST;
@@ -286,34 +296,36 @@ public class CalendarEditor extends JFrame {
         headerGbc.anchor = GridBagConstraints.EAST;
         headerPanel.add(homeButton, headerGbc);
 
-        //AYDAN - APR 23
         headerGbc.gridx = 6;
         headerPanel.add(modifyEventButton, headerGbc);
 
+        headerGbc.gridx = 7;
+        headerPanel.add(modifyClassButton, headerGbc);
 
-        // Calendar Panel
+        // --- Calendar Panel
         calendarPanel = new JPanel(new GridLayout(0, 7, 5, 5));
         calendarPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
         calendarPanel.setBackground(Color.WHITE);
 
         updateCalendar(currentYear, currentMonth);
 
-        // Button Listeners
+        // --- Button Listeners
         prevButton.addActionListener(e -> changeMonth(-1));
         nextButton.addActionListener(e -> changeMonth(1));
         homeButton.addActionListener(e -> cardLayout.show(mainPanel, "Home"));
         classButton.addActionListener(e -> createClass());
-        //AYDAN - APR 23
-        modifyEventButton.addActionListener(e -> openModifyEventWindow());
-
-
-        //logout (SHIBUYA
         logoutButton.addActionListener(e -> {
             isLoggedIn = false;
             goToCalendarButton.setEnabled(false);
+            currentUsername = null;
+            eventListModel.clear();
+            events.clear();
+            classes.clear();
+            updateCalendar(currentYear, currentMonth);
             cardLayout.show(mainPanel, "Home");
         });
-        // Layout for Calendar Page
+
+        // Layout Calendar Page
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.weightx = 1;
@@ -336,17 +348,17 @@ public class CalendarEditor extends JFrame {
         JTextField locationField = new JTextField(event.getLocation());
         JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
         classBox.setSelectedItem(event.getCourse());
-    
+
         JPanel panel = new JPanel(new GridLayout(0, 1));
         panel.add(new JLabel("Title:")); panel.add(titleField);
         panel.add(new JLabel("Time (HH:mm):")); panel.add(timeField);
         panel.add(new JLabel("Description:")); panel.add(descriptionField);
         panel.add(new JLabel("Location:")); panel.add(locationField);
         panel.add(new JLabel("Class:")); panel.add(classBox);
-    
+
         int result = JOptionPane.showConfirmDialog(CalendarEditor.this, panel, "Edit Event", JOptionPane.OK_CANCEL_OPTION);
         //JOptionPane.showConfirmDialog(this, panel, "Edit Event", JOptionPane.OK_CANCEL_OPTION);
-    
+
         if (result == JOptionPane.OK_OPTION) {
             try {
                 CalendarEvent updated = new CalendarEvent(
@@ -357,7 +369,7 @@ public class CalendarEditor extends JFrame {
                         locationField.getText().trim(),
                         (ClassCourse) classBox.getSelectedItem()
                 );
-                
+
                 //AYDAN - APR 24
                 // Remove old event (from local map)
                 events.get(event.getDate().toString()).remove(event);
@@ -382,7 +394,7 @@ public class CalendarEditor extends JFrame {
                 // events.get(event.getDate().toString()).remove(event);
                 // FirebaseUserService.saveEvent(currentUsername, updated); // Overwrite
                 // FirebaseUserService.saveUpcomingTask(currentUsername, updated); // Also update task view
-    
+
                 events.computeIfAbsent(updated.getDate().toString(), k -> new ArrayList<>()).add(updated);
                 JOptionPane.showMessageDialog(this, "Event updated.");
                 updateCalendar(currentYear, currentMonth);
@@ -392,51 +404,51 @@ public class CalendarEditor extends JFrame {
             }
         }
     }
-    
+
     //AYDAN - APR 23
     private void deleteEvent(CalendarEvent event) {
         String dateKey = event.getDate().toString();
         List<CalendarEvent> dayEvents = events.getOrDefault(dateKey, new ArrayList<>());
         dayEvents.remove(event);
-    
+
         // 🧹 Remove key entirely if list is now empty
         if (dayEvents.isEmpty()) {
             events.remove(dateKey);
         }
-    
+
         String eventId = event.getTitle() + "_" + event.getDate();
         FirebaseSetup.getDatabase()
             .getReference("users").child(currentUsername).child("events").child(eventId)
             .removeValueAsync();
-    
+
         FirebaseSetup.getDatabase()
             .getReference("users").child(currentUsername).child("upcomingTasks").child(eventId)
             .removeValueAsync();
-    
+
         JOptionPane.showMessageDialog(this, "Event deleted.");
         updateCalendar(currentYear, currentMonth);
         updateTaskList();
         modifyEventButton.setEnabled(!events.isEmpty()); // Optional if you kept this logic
     }
-    
+
     // private void deleteEvent(CalendarEvent event) {
     //     events.get(event.getDate().toString()).remove(event);
-    
+
     //     // Firebase path from saveEvent: username/events/title_date
     //     String eventId = event.getTitle() + "_" + event.getDate();
     //     FirebaseSetup.getDatabase()
     //         .getReference("users").child(currentUsername).child("events").child(eventId)
     //         .removeValueAsync();
-    
+
     //     FirebaseSetup.getDatabase()
     //         .getReference("users").child(currentUsername).child("upcomingTasks").child(eventId)
     //         .removeValueAsync();
-    
+
     //     JOptionPane.showMessageDialog(this, "Event deleted.");
     //     updateCalendar(currentYear, currentMonth);
     //     updateTaskList();
     // }
-    
+
 
     //AYDAN - APR 23
     private void openModifyEventWindow() {
@@ -444,27 +456,27 @@ public class CalendarEditor extends JFrame {
         for (List<CalendarEvent> evts : events.values()) {
             allEvents.addAll(evts);
         }
-    
+
         if (allEvents.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No events available to modify.");
             return;
         }
-    
+
         //Sort descending
         allEvents.sort((a, b) -> b.getDate().compareTo(a.getDate()));
-    
+
         DefaultListModel<String> listModel = new DefaultListModel<>();
         for (CalendarEvent evt : allEvents) {
             listModel.addElement(evt.getDate() + " - " + evt.getTitle());
         }
-    
+
         JList<String> eventJList = new JList<>(listModel);
         eventJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         JScrollPane scrollPane = new JScrollPane(eventJList);
-    
+
         JButton editButton = new JButton("Edit");
         JButton deleteButton = new JButton("Delete");
-    
+
         editButton.addActionListener(e -> {
             int index = eventJList.getSelectedIndex();
             if (index >= 0) {
@@ -472,7 +484,7 @@ public class CalendarEditor extends JFrame {
                 modifyEvent(selected);
             }
         });
-    
+
         deleteButton.addActionListener(e -> {
             int index = eventJList.getSelectedIndex();
             if (index >= 0) {
@@ -481,22 +493,24 @@ public class CalendarEditor extends JFrame {
                 listModel.remove(index);
             }
         });
-    
+
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(scrollPane, BorderLayout.CENTER);
-    
+
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(editButton);
         buttonPanel.add(deleteButton);
-    
+
         panel.add(buttonPanel, BorderLayout.SOUTH);
-    
+
         JOptionPane.showMessageDialog(CalendarEditor.this, panel, "Modify Events", JOptionPane.PLAIN_MESSAGE);
         //JOptionPane.showMessageDialog(this, panel, "Modify Events", JOptionPane.PLAIN_MESSAGE);
     }
-    
 
-    private void updateCalendar(int year, int month) {
+
+
+
+    void updateCalendar(int year, int month) {
         calendarPanel.removeAll();
         calendarPanel.setLayout(new GridLayout(0, 7, 1, 1));
 
@@ -595,13 +609,11 @@ public class CalendarEditor extends JFrame {
         calendarPanel.repaint();
     }
 
-    private void createClass() {
-        Color[] colors = {Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.ORANGE, Color.cyan, Color.magenta, Color.PINK};
-        String[] ColorNames = {"Red", "Green", "Blue", "Yellow", "Orange", "Cyan", "Magenta", "Pink"};
+    void createClass() {
         JTextField nameField = new JTextField(15);
         JTextField instructorTextField = new JTextField(15);
         JTextField locationTextField = new JTextField(15);
-        JComboBox<Color> colorBox = new JComboBox<>(colors);        JPanel panel = new JPanel(new GridLayout(0,1));
+        JPanel panel = new JPanel(new GridLayout(0,1));
 
 
 
@@ -611,8 +623,7 @@ public class CalendarEditor extends JFrame {
         panel.add(instructorTextField);
         panel.add(new JLabel("Room #: "));
         panel.add(locationTextField);
-        panel.add(new JLabel("Color: "));
-        panel.add(colorBox, BorderLayout.CENTER);
+
 
 
         int result = JOptionPane.showConfirmDialog(
@@ -628,7 +639,7 @@ public class CalendarEditor extends JFrame {
             String instructor = instructorTextField.getText().trim();
             String location = locationTextField.getText().trim();
 
-            ClassCourse newClass = new ClassCourse(name, Color.CYAN, instructor, location); // You can let users pick color later
+            ClassCourse newClass = new ClassCourse(name, instructor, location); // You can let users pick color later
             classes.add(newClass);
 
 //firebase Shibuya save in fire base
@@ -690,10 +701,16 @@ public class CalendarEditor extends JFrame {
     //     }
     // }
 
-    private void updateTaskList() {
-        // read from firbase
+    void updateTaskList() {
+        if (currentUsername == null || currentUsername.isEmpty()) {
+            eventListModel.clear(); // Optional: clear the task list if no user
+            return;
+        }
         FirebaseUserService.loadUpcomingTasks(currentUsername, eventListModel);
     }
+
+
+
 
     /*
     private void updateTaskList() {
@@ -788,16 +805,15 @@ public class CalendarEditor extends JFrame {
         JTextField locationField = new JTextField(15);
         JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
 
-        //AYDAN - APR 23
         JCheckBox recurringBox = new JCheckBox("Repeat Weekly?");
-        JSpinner repeatWeeksSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 52, 1)); // 1–52 weeks
-        repeatWeeksSpinner.setEnabled(false); // Disabled by default
+        JSpinner repeatWeeksSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 52, 1));
+        repeatWeeksSpinner.setEnabled(false);
 
         recurringBox.addActionListener(e -> {
             repeatWeeksSpinner.setEnabled(recurringBox.isSelected());
         });
 
-        // Layout panel
+        // Layout
         JPanel panel = new JPanel(new GridLayout(0, 1));
         panel.add(new JLabel("Title:"));
         panel.add(titleField);
@@ -809,8 +825,6 @@ public class CalendarEditor extends JFrame {
         panel.add(locationField);
         panel.add(new JLabel("Class:"));
         panel.add(classBox);
-
-        //AYDAN - APR 23
         panel.add(recurringBox);
         panel.add(new JLabel("Repeat for (weeks):"));
         panel.add(repeatWeeksSpinner);
@@ -829,57 +843,49 @@ public class CalendarEditor extends JFrame {
                 LocalTime time = LocalTime.parse(timeField.getText().trim());
                 String description = descriptionField.getText().trim();
                 String location = locationField.getText().trim();
-
-                // Create new event and add it to the map
                 ClassCourse selectedClass = (ClassCourse) classBox.getSelectedItem();
-                CalendarEvent newEvent = new CalendarEvent(title, date, time, description, location, selectedClass);
 
-                //AYDAN - APR 23
+                if (selectedClass == null) {
+                    JOptionPane.showMessageDialog(this, "Please select a class before saving the event.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
                 List<CalendarEvent> newEvents = new ArrayList<>();
                 int repeatWeeks = (int) repeatWeeksSpinner.getValue();
 
                 for (int i = 0; i < (recurringBox.isSelected() ? repeatWeeks : 1); i++) {
                     LocalDate eventDate = date.plusWeeks(i);
-                    if (eventDate.isAfter(date.plusYears(1))) break; // Max 1-year cap
+                    if (eventDate.isAfter(date.plusYears(1))) break;
 
                     CalendarEvent evt = new CalendarEvent(
-                        titleField.getText().trim(),
-                        eventDate,
-                        LocalTime.parse(timeField.getText().trim()),
-                        descriptionField.getText().trim(),
-                        locationField.getText().trim(),
-                        (ClassCourse) classBox.getSelectedItem()
-                );
+                            title,
+                            eventDate,
+                            time,
+                            description,
+                            location,
+                            selectedClass
+                    );
+                    newEvents.add(evt);
+                }
 
-                newEvents.add(evt);
-            }
-            
-            //AYDAN - APR 24
-            for (CalendarEvent evt : newEvents) {
-                FirebaseUserService.saveEvent(currentUsername, evt);
-                FirebaseUserService.saveUpcomingTask(currentUsername, evt);
-            
-                String key = evt.getDate().toString();
-                events.computeIfAbsent(key, k -> new ArrayList<>()).add(evt);
-            }
+                for (CalendarEvent evt : newEvents) {
+                    FirebaseUserService.saveEvent(currentUsername, evt);
+                    FirebaseUserService.saveUpcomingTask(currentUsername, evt);
+
+                    String key = evt.getDate().toString();
+                    events.computeIfAbsent(key, k -> new ArrayList<>()).add(evt);
+                }
+
                 JOptionPane.showMessageDialog(null, "Recurring event(s) added successfully!");
                 updateCalendar(currentYear, currentMonth);
                 updateTaskList();
-            
-                // //firebase Shibuya　save event and upcoming
-                // FirebaseUserService.saveEvent(currentUsername, newEvent);
-                // FirebaseUserService.saveUpcomingTask(currentUsername, newEvent);
 
-
-                // events.computeIfAbsent(date.toString(), k -> new ArrayList<>()).add(newEvent);
-                // JOptionPane.showMessageDialog(null, "Event added successfully!");
-                // updateCalendar(currentYear, currentMonth);
-                // updateTaskList();
             } catch (DateTimeParseException e) {
-                JOptionPane.showMessageDialog(null, "Invalid time format. Please use HH:mm.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Invalid time format. Please use HH:mm.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
+
 
     //AYDAN commented out for now, not needed atm - APR 9
     // private String getButtonText(int selectedDay, String key) {
@@ -904,7 +910,7 @@ public class CalendarEditor extends JFrame {
     //     return eventDetails.toString();
     // }
 
-    private void changeMonth(int delta) {
+    void changeMonth(int delta) {
         currentMonth += delta;
         if (currentMonth < 0) {
             currentMonth = 11;
@@ -927,4 +933,6 @@ public class CalendarEditor extends JFrame {
             frame.setLocationRelativeTo(null);
         });
     }
+
+
 }

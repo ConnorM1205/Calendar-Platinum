@@ -71,7 +71,6 @@ public class FirebaseUserService {
         classData.put("title", course.getTitle());
         classData.put("location", course.getLocation());
         classData.put("instructor", course.getInstructor());
-        classData.put("colorRGB", course.getColor().getRGB());
 
         ref.child("users").child(username).child("classes").child(classId).setValueAsync(classData);
         System.out.println("Class saved: " + classId);
@@ -93,7 +92,7 @@ public class FirebaseUserService {
                             Integer colorRGB = classSnap.child("colorRGB").getValue(Integer.class);
                             Color color = new Color(colorRGB != null ? colorRGB : Color.CYAN.getRGB());
 
-                            classList.add(new ClassCourse(title, color, instructor, location));
+                            classList.add(new ClassCourse(title, instructor, location));
                         }
                         latch.countDown();
                     }
@@ -199,6 +198,10 @@ public class FirebaseUserService {
 
 
     public static void loadUpcomingTasks(String username, DefaultListModel<String> model) {
+        if (username == null || username.isEmpty()) {
+            return;
+        }
+
         try {
             DatabaseReference dbRef = FirebaseSetup.getDatabase()
                     .getReference("users")
@@ -214,9 +217,11 @@ public class FirebaseUserService {
                         String date = child.child("date").getValue(String.class);
                         String time = child.child("time").getValue(String.class);
 
-                        model.addElement(date + " - " + title + " @ " + time);
+                        if (title != null && date != null && time != null) {
+                            model.addElement(date + " - " + title + " @ " + time);
+                        }
                     }
-                    System.out.println("Upcoming tasks loaded for " + username);
+                    System.out.println("Loaded upcoming tasks for " + username);
                 }
 
                 @Override
@@ -228,8 +233,8 @@ public class FirebaseUserService {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
+
     public static void deleteUser(String username) {
         try {
             DatabaseReference ref = FirebaseDatabase.getInstance().getReference();
