@@ -12,9 +12,6 @@ public class CalendarEvent {
     private final ClassCourse course;
 
 
-
-
-
     public CalendarEvent(String title, LocalDate date, LocalTime time, String description, String location, ClassCourse course) {
         this.title = title;
         this.date = date;
