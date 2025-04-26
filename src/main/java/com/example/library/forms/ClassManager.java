@@ -112,4 +112,9 @@ public class ClassManager {
             }
         }
     }
+    public void saveNewClass(ClassCourse newClass) {
+        classes.add(newClass);
+        FirebaseUserService.saveClass(currentUsername, newClass);
+    }
+
 }

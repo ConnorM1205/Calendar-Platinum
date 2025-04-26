@@ -68,69 +68,39 @@ public class CalendarEditor extends JFrame implements HomePanelListener, Calenda
 
 
     //AYDAN - APR 23
-    private void modifyEvent(CalendarEvent event) {
-        JTextField titleField = new JTextField(event.getTitle());
-        JTextField timeField = new JTextField(event.getTime().toString());
-        JTextField descriptionField = new JTextField(event.getDescription());
-        JTextField locationField = new JTextField(event.getLocation());
-        JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
-        classBox.setSelectedItem(event.getCourse());
+    void modifyEvent(CalendarEvent event) {
+        CalendarEvent updated = DialogManager.showModifyEventDialog(this, event);
 
-        JPanel panel = new JPanel(new GridLayout(0, 1));
-        panel.add(new JLabel("Title:")); panel.add(titleField);
-        panel.add(new JLabel("Time (HH:mm):")); panel.add(timeField);
-        panel.add(new JLabel("Description:")); panel.add(descriptionField);
-        panel.add(new JLabel("Location:")); panel.add(locationField);
-        panel.add(new JLabel("Class:")); panel.add(classBox);
-
-        int result = JOptionPane.showConfirmDialog(CalendarEditor.this, panel, "Edit Event", JOptionPane.OK_CANCEL_OPTION);
-        //JOptionPane.showConfirmDialog(this, panel, "Edit Event", JOptionPane.OK_CANCEL_OPTION);
-
-        if (result == JOptionPane.OK_OPTION) {
-            try {
-                CalendarEvent updated = new CalendarEvent(
-                        titleField.getText().trim(),
-                        event.getDate(),
-                        LocalTime.parse(timeField.getText().trim()),
-                        descriptionField.getText().trim(),
-                        locationField.getText().trim(),
-                        (ClassCourse) classBox.getSelectedItem()
-                );
-
-                //AYDAN - APR 24
-                // Remove old event (from local map)
-                events.get(event.getDate().toString()).remove(event);
-                // Remove old event from Firebase
-                String oldEventId = event.getTitle() + "_" + event.getDate();
-                FirebaseSetup.getDatabase()
-                        .getReference("users").child(currentUsername).child("events").child(oldEventId)
-                        .removeValueAsync();
-                FirebaseSetup.getDatabase()
-                        .getReference("users").child(currentUsername).child("upcomingTasks").child(oldEventId)
-                        .removeValueAsync();
-
-                // Save updated event
-                FirebaseUserService.saveEvent(currentUsername, updated);
-                FirebaseUserService.saveUpcomingTask(currentUsername, updated);
-
-                // Update local storage
-                events.computeIfAbsent(updated.getDate().toString(), k -> new ArrayList<>()).add(updated);
-
-
-                FirebaseUserService.saveUpcomingTask(currentUsername, updated); // Also update task view
-
-                events.computeIfAbsent(updated.getDate().toString(), k -> new ArrayList<>()).add(updated);
-                JOptionPane.showMessageDialog(this, "Event updated.");
-                updateCalendar(currentYear, currentMonth);
-                updateTaskList();
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Update failed: " + e.getMessage());
-            }
+        if (updated == null) {
+            return; // User cancelled
         }
+
+        // Remove old event from local
+        events.get(event.getDate().toString()).remove(event);
+
+        // Remove old event from Firebase
+        String oldEventId = event.getTitle() + "_" + event.getDate();
+        FirebaseSetup.getDatabase()
+                .getReference("users").child(currentUsername).child("events").child(oldEventId)
+                .removeValueAsync();
+        FirebaseSetup.getDatabase()
+                .getReference("users").child(currentUsername).child("upcomingTasks").child(oldEventId)
+                .removeValueAsync();
+
+        // Save updated event
+        FirebaseUserService.saveEvent(currentUsername, updated);
+        FirebaseUserService.saveUpcomingTask(currentUsername, updated);
+
+        // Add updated event to local map
+        events.computeIfAbsent(updated.getDate().toString(), k -> new ArrayList<>()).add(updated);
+
+        JOptionPane.showMessageDialog(this, "Event updated.");
+        updateCalendar(currentYear, currentMonth);
+        updateTaskList();
     }
 
     //AYDAN - APR 23
-    private void deleteEvent(CalendarEvent event) {
+    void deleteEvent(CalendarEvent event) {
         String dateKey = event.getDate().toString();
         List<CalendarEvent> dayEvents = events.getOrDefault(dateKey, new ArrayList<>());
         dayEvents.remove(event);
@@ -162,54 +132,9 @@ public class CalendarEditor extends JFrame implements HomePanelListener, Calenda
             allEvents.addAll(evts);
         }
 
-        if (allEvents.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No events available to modify.");
-            return;
-        }
-
-        //Sort descending
-        allEvents.sort((a, b) -> b.getDate().compareTo(a.getDate()));
-
-        DefaultListModel<String> listModel = new DefaultListModel<>();
-        for (CalendarEvent evt : allEvents) {
-            listModel.addElement(evt.getDate() + " - " + evt.getTitle());
-        }
-
-        JList<String> eventJList = new JList<>(listModel);
-        eventJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        JScrollPane scrollPane = new JScrollPane(eventJList);
-
-        JButton editButton = new JButton("Edit");
-        JButton deleteButton = new JButton("Delete");
-
-        editButton.addActionListener(e -> {
-            int index = eventJList.getSelectedIndex();
-            if (index >= 0) {
-                CalendarEvent selected = allEvents.get(index);
-                modifyEvent(selected);
-            }
-        });
-
-        deleteButton.addActionListener(e -> {
-            int index = eventJList.getSelectedIndex();
-            if (index >= 0) {
-                CalendarEvent selected = allEvents.get(index);
-                deleteEvent(selected);
-                listModel.remove(index);
-            }
-        });
-
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(scrollPane, BorderLayout.CENTER);
-
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.add(editButton);
-        buttonPanel.add(deleteButton);
-
-        panel.add(buttonPanel, BorderLayout.SOUTH);
-
-        JOptionPane.showMessageDialog(CalendarEditor.this, panel, "Modify Events", JOptionPane.PLAIN_MESSAGE);
+        DialogManager.showModifyEventWindow(this, allEvents);
     }
+
 
 
 
@@ -297,44 +222,7 @@ public class CalendarEditor extends JFrame implements HomePanelListener, Calenda
         calendarPanel.repaint();
     }
 
-    private void createClass() {
-        JTextField nameField = new JTextField(15);
-        JTextField instructorTextField = new JTextField(15);
-        JTextField locationTextField = new JTextField(15);
-        JPanel panel = new JPanel(new GridLayout(0,1));
 
-
-
-        panel.add(new JLabel("Class: "));
-        panel.add(nameField);
-        panel.add(new JLabel("Instructor: "));
-        panel.add(instructorTextField);
-        panel.add(new JLabel("Room #: "));
-        panel.add(locationTextField);
-
-
-        int result = JOptionPane.showConfirmDialog(
-                this,
-                panel,
-                "Create New Class",
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE
-        );
-
-        if (result == JOptionPane.OK_OPTION) {
-            String name = nameField.getText().trim();
-            String instructor = instructorTextField.getText().trim();
-            String location = locationTextField.getText().trim();
-
-            ClassCourse newClass = new ClassCourse(name, instructor, location); // You can let users pick color later
-            classes.add(newClass);
-
-//firebase Shibuya save in fire base
-            FirebaseUserService.saveClass(currentUsername, newClass);
-
-            JOptionPane.showMessageDialog(this, "Class \"" + name + "\" created.");
-        }
-    }
 
     //AYDAN: added this func. - APR 9
     private void showEventsForDay(int day, int month, int year) {
@@ -378,96 +266,25 @@ public class CalendarEditor extends JFrame implements HomePanelListener, Calenda
     private void showEventDialog(int day, int month, int year) {
         LocalDate date = LocalDate.of(year, month + 1, day);
 
-        // Create the input fields
-        JTextField titleField = new JTextField(15);
-        JTextField timeField = new JTextField("HH:mm", 5);
-        JTextField descriptionField = new JTextField(20);
-        JTextField locationField = new JTextField(15);
-        JComboBox<ClassCourse> classBox = new JComboBox<>(classes.toArray(new ClassCourse[0]));
+        List<CalendarEvent> newEvents = DialogManager.showCreateEventDialog(this, date);
 
-        //AYDAN - APR 23
-        JCheckBox recurringBox = new JCheckBox("Repeat Weekly?");
-        JSpinner repeatWeeksSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 52, 1)); // 1–52 weeks
-        repeatWeeksSpinner.setEnabled(false); // Disabled by default
-
-        recurringBox.addActionListener(e -> {
-            repeatWeeksSpinner.setEnabled(recurringBox.isSelected());
-        });
-
-        // Layout panel
-        JPanel panel = new JPanel(new GridLayout(0, 1));
-        panel.add(new JLabel("Title:"));
-        panel.add(titleField);
-        panel.add(new JLabel("Time (HH:mm):"));
-        panel.add(timeField);
-        panel.add(new JLabel("Description:"));
-        panel.add(descriptionField);
-        panel.add(new JLabel("Location:"));
-        panel.add(locationField);
-        panel.add(new JLabel("Class:"));
-        panel.add(classBox);
-
-        //AYDAN - APR 23
-        panel.add(recurringBox);
-        panel.add(new JLabel("Repeat for (weeks):"));
-        panel.add(repeatWeeksSpinner);
-
-        int result = JOptionPane.showConfirmDialog(
-                null,
-                panel,
-                "Add Event for " + date.format(DateTimeFormatter.ofPattern("MM/dd/yyyy")),
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE
-        );
-
-        if (result == JOptionPane.OK_OPTION) {
-            try {
-                String title = titleField.getText().trim();
-                LocalTime time = LocalTime.parse(timeField.getText().trim());
-                String description = descriptionField.getText().trim();
-                String location = locationField.getText().trim();
-
-                // Create new event and add it to the map
-                ClassCourse selectedClass = (ClassCourse) classBox.getSelectedItem();
-                CalendarEvent newEvent = new CalendarEvent(title, date, time, description, location, selectedClass);
-
-                //AYDAN - APR 23
-                List<CalendarEvent> newEvents = new ArrayList<>();
-                int repeatWeeks = (int) repeatWeeksSpinner.getValue();
-
-                for (int i = 0; i < (recurringBox.isSelected() ? repeatWeeks : 1); i++) {
-                    LocalDate eventDate = date.plusWeeks(i);
-                    if (eventDate.isAfter(date.plusYears(1))) break; // Max 1-year cap
-
-                    CalendarEvent evt = new CalendarEvent(
-                            titleField.getText().trim(),
-                            eventDate,
-                            LocalTime.parse(timeField.getText().trim()),
-                            descriptionField.getText().trim(),
-                            locationField.getText().trim(),
-                            (ClassCourse) classBox.getSelectedItem()
-                    );
-
-                    newEvents.add(evt);
-                }
-
-                //AYDAN - APR 24
-                for (CalendarEvent evt : newEvents) {
-                    FirebaseUserService.saveEvent(currentUsername, evt);
-                    FirebaseUserService.saveUpcomingTask(currentUsername, evt);
-
-                    String key = evt.getDate().toString();
-                    events.computeIfAbsent(key, k -> new ArrayList<>()).add(evt);
-                }
-                JOptionPane.showMessageDialog(null, "Recurring event(s) added successfully!");
-                updateCalendar(currentYear, currentMonth);
-                updateTaskList();
-
-            } catch (DateTimeParseException e) {
-                JOptionPane.showMessageDialog(null, "Invalid time format. Please use HH:mm.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+        if (newEvents.isEmpty()) {
+            return; // User cancelled
         }
+
+        for (CalendarEvent evt : newEvents) {
+            FirebaseUserService.saveEvent(currentUsername, evt);
+            FirebaseUserService.saveUpcomingTask(currentUsername, evt);
+
+            String key = evt.getDate().toString();
+            events.computeIfAbsent(key, k -> new ArrayList<>()).add(evt);
+        }
+
+        JOptionPane.showMessageDialog(this, "Recurring event(s) added successfully!");
+        updateCalendar(currentYear, currentMonth);
+        updateTaskList();
     }
+
 
 
     private void changeMonth(int delta) {
@@ -550,7 +367,7 @@ public class CalendarEditor extends JFrame implements HomePanelListener, Calenda
 
     @Override
     public void onCreateClass() {
-        createClass();
+        DialogManager.showCreateClassDialog(classManager);
     }
 
     @Override
