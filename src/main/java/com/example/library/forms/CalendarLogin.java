@@ -10,7 +10,7 @@ public class CalendarLogin {
     public interface LoginListener {
         void onLoginSuccess(String username);
     }
-//login
+    //login
     public static void showLoginDialog(LoginListener listener) {
         JTextField userField = new JTextField();
         JPasswordField passField = new JPasswordField();
@@ -32,7 +32,7 @@ public class CalendarLogin {
             }
         }
     }
-//register
+    //register
     public static void showRegisterDialog() {
         JTextField userField = new JTextField();
         JPasswordField passField = new JPasswordField();
@@ -55,7 +55,7 @@ public class CalendarLogin {
             JOptionPane.showMessageDialog(null, "User registered successfully.");
         }
     }
-//delete
+    //delete
     public static void showDeleteUserDialog() {
         JTextField userField = new JTextField();
         JPasswordField passField = new JPasswordField();

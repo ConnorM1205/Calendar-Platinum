@@ -1,3 +1,4 @@
+
 package com.example.library.forms.firebase;
 
 import com.example.library.forms.CalendarEvent;
@@ -18,14 +19,30 @@ public class FirebaseUserService {
     public static void saveUser(String username, String password) {
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference();
 
-        String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+        // Check if user already exists
+        ref.child("users").child(username).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    JOptionPane.showMessageDialog(null, "Username already exists.");
+                } else {
+                    String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
 
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("password", hashedPassword);
+                    Map<String, Object> userData = new HashMap<>();
+                    userData.put("password", hashedPassword);
 
-        ref.child("users").child(username).setValueAsync(userData);
-        System.out.println("User saved: " + username);
+                    ref.child("users").child(username).setValueAsync(userData);
+                    System.out.println("User saved: " + username);
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                System.out.println("Error checking user: " + error.getMessage());
+            }
+        });
     }
+
 
     public static boolean loginUser(String username, String password) {
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference();
@@ -81,6 +98,7 @@ public class FirebaseUserService {
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference();
         CountDownLatch latch = new CountDownLatch(1);
 
+
         ref.child("users").child(username).child("classes").addListenerForSingleValueEvent(
                 new ValueEventListener() {
                     @Override
@@ -93,7 +111,9 @@ public class FirebaseUserService {
                             Color color = new Color(colorRGB != null ? colorRGB : Color.CYAN.getRGB());
 
                             classList.add(new ClassCourse(title, instructor, location));
+
                         }
+
                         latch.countDown();
                     }
 
@@ -145,7 +165,13 @@ public class FirebaseUserService {
                             String timeStr = eventSnap.child("time").getValue(String.class);
                             String description = eventSnap.child("description").getValue(String.class);
                             String location = eventSnap.child("location").getValue(String.class);
+                            // String classTitle = eventSnap.child("classTitle").getValue(String.class);
+
                             String classTitle = eventSnap.child("classTitle").getValue(String.class);
+                            if (classTitle == null) {
+                                System.out.println("⚠️ Skipping event: classTitle is null");
+                                continue;
+                            }
 
                             LocalDate date = LocalDate.parse(dateStr);
                             LocalTime time = LocalTime.parse(timeStr);
@@ -153,6 +179,10 @@ public class FirebaseUserService {
                             ClassCourse course = classList.stream()
                                     .filter(c -> c.getTitle().equals(classTitle))
                                     .findFirst().orElse(null);
+                            if (course == null) {
+                                System.out.println("⚠️ Skipping event: Class not found for title → " + classTitle);
+                                continue;
+                            }
 
                             eventList.add(new CalendarEvent(title, date, time, description, location, course));
                         }
@@ -165,6 +195,7 @@ public class FirebaseUserService {
                         latch.countDown();
                     }
                 }
+
         );
 
         try {
@@ -198,10 +229,6 @@ public class FirebaseUserService {
 
 
     public static void loadUpcomingTasks(String username, DefaultListModel<String> model) {
-        if (username == null || username.isEmpty()) {
-            return;
-        }
-
         try {
             DatabaseReference dbRef = FirebaseSetup.getDatabase()
                     .getReference("users")
@@ -217,11 +244,9 @@ public class FirebaseUserService {
                         String date = child.child("date").getValue(String.class);
                         String time = child.child("time").getValue(String.class);
 
-                        if (title != null && date != null && time != null) {
-                            model.addElement(date + " - " + title + " @ " + time);
-                        }
+                        model.addElement(date + " - " + title + " @ " + time);
                     }
-                    System.out.println("Loaded upcoming tasks for " + username);
+                    System.out.println("Upcoming tasks loaded for " + username);
                 }
 
                 @Override
@@ -233,6 +258,7 @@ public class FirebaseUserService {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
     }
 
     public static void deleteUser(String username) {
@@ -245,4 +271,31 @@ public class FirebaseUserService {
         }
     }
 
+
+    public static boolean userExists(String username) {
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("users").child(username);
+        final boolean[] exists = {false};
+        CountDownLatch latch = new CountDownLatch(1);
+
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                exists[0] = snapshot.exists();
+                latch.countDown();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                latch.countDown();
+            }
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        return exists[0];
+    }
 }
