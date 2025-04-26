@@ -13,31 +13,35 @@ import com.example.library.forms.firebase.FirebaseSetup;
 import com.example.library.forms.firebase.FirebaseUserService;
 
 
-public class CalendarEditor extends JFrame {
-    private ClassManager classManager;
+public class CalendarEditor extends JFrame implements HomePanelListener, CalendarPanelListener {
+    public ClassManager classManager;
     private final JPanel mainPanel;
     private final CardLayout cardLayout;
     private JPanel calendarPanel;
     private JLabel monthLabel;
-    private int currentYear, currentMonth;
-    private final Map<String, List<CalendarEvent>> events = new HashMap<>();
-    private DefaultListModel<String> eventListModel = new DefaultListModel<>();
+    public int currentYear;
+    public int currentMonth;
+    public final Map<String, List<CalendarEvent>> events = new HashMap<>();
+    public DefaultListModel<String> eventListModel = new DefaultListModel<>();
     // Add this as a class field
-    private final List<ClassCourse> classes = new ArrayList<>();
+    public final List<ClassCourse> classes = new ArrayList<>();
     //firebase Shibuya
-    private String currentUsername;
+    public String currentUsername;
 
     //AYDAN - APR 23
     private JButton modifyEventButton;
 
     //(SHIBUYA
-    private boolean isLoggedIn = false;
+    public boolean isLoggedIn = false;
     //(SHIBUYA
-    private JButton goToCalendarButton;
+    public JButton goToCalendarButton = new JButton("View Calendar");
+    public JButton loginButton = new JButton("Login");
+    public JButton registerButton = new JButton("Register");
+    public JButton deleteUserButton = new JButton("Delete User");
 
-    private JButton loginButton;
 
     public CalendarEditor() {
+
         setSize(400, 300);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -46,295 +50,21 @@ public class CalendarEditor extends JFrame {
         mainPanel = new JPanel(cardLayout);
 
 
-        JPanel homePanel = createHomePanel();
-
-        JPanel calendarPage = createCalendarPanel();
+        HomePanel homePanelBuilder = new HomePanel(this, goToCalendarButton, loginButton, registerButton, deleteUserButton, eventListModel);        JPanel homePanel = homePanelBuilder.createHomePanel();
+        CalendarPanel calendarPanelBuilder = new CalendarPanel(this);
+        JPanel calendarPanel = calendarPanelBuilder.createCalendarPanel();
 
         mainPanel.add(homePanel, "Home");
-        mainPanel.add(calendarPage, "Calendar");
-
+        mainPanel.add(calendarPanel, "Calendar");
         add(mainPanel, BorderLayout.CENTER);
         cardLayout.show(mainPanel, "Home"); // Show home page initially
-    }
-
-
-
-    private JPanel createHomePanel() {
-        JPanel homePanel = new JPanel(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-
-        // --- Logo Image ---
-        ImageIcon icon = new ImageIcon("CSU_San_Marcos_seal.svg.png");
-        Image scaledImage = icon.getImage().getScaledInstance(200, 200, Image.SCALE_SMOOTH);
-        ImageIcon scaledIcon = new ImageIcon(scaledImage);
-        JLabel imageLabel = new JLabel(scaledIcon);
-
-        // --- Title Label ---
-        JLabel homeLabel = new JLabel("Canvas Platinum", SwingConstants.CENTER);
-        homeLabel.setFont(new Font("Montserrat", Font.BOLD, 20));
-
-
-        // --- Calendar Button ---
-        //can't view calendar before login (SHIBUYA)
-        goToCalendarButton = new JButton("View Calendar");
-        goToCalendarButton.setEnabled(false);
-        goToCalendarButton.addActionListener(e -> {
-            if (isLoggedIn) {
-                cardLayout.show(mainPanel, "Calendar");
-            } else {
-                JOptionPane.showMessageDialog(null, "Please log in first.");
-            }
-        });
-
-        //login button
-        loginButton = new JButton("Login");
-
-        loginButton.setPreferredSize(goToCalendarButton.getPreferredSize());
-
-        loginButton.addActionListener(e -> {
-            if (isLoggedIn) {
-                JOptionPane.showMessageDialog(null, "You are already logged in.");
-                return;
-            }
-
-            CalendarLogin.showLoginDialog(username -> {
-                System.out.println("Login successful. Username: " + username);
-
-                isLoggedIn = true;
-                currentUsername = username;
-                goToCalendarButton.setEnabled(true);
-                loginButton.setEnabled(false);  // Disable login button after login
-
-                classes.clear();
-                classManager = new ClassManager(this, classes, currentUsername);
-                classes.addAll(FirebaseUserService.loadClasses(username));
-
-                List<CalendarEvent> loadedEvents = FirebaseUserService.loadEvents(username, classes);
-                events.clear();
-                for (CalendarEvent event : loadedEvents) {
-                    String key = event.getDate().toString();
-                    events.computeIfAbsent(key, k -> new ArrayList<>()).add(event);
-                }
-
-                FirebaseUserService.loadUpcomingTasks(currentUsername, eventListModel);
-                updateCalendar(currentYear, currentMonth);
-                updateTaskList();
-                cardLayout.show(mainPanel, "Calendar");
-            });
-        });
-
-
-//register and delete button
-        JButton registerButton = new JButton("Register");
-        registerButton.setPreferredSize(goToCalendarButton.getPreferredSize());
-        registerButton.addActionListener(e -> CalendarLogin.showRegisterDialog());
-
-        JButton deleteUserButton = new JButton("Delete User");
-        deleteUserButton.setPreferredSize(goToCalendarButton.getPreferredSize());
-        deleteUserButton.addActionListener(e -> CalendarLogin.showDeleteUserDialog());
-
-        // --- Task List ---
-        //  eventListModel = new DefaultListModel<>();  // Initialize the class field
-        updateTaskList();
-
-// Create a JList to display event titles
-        JList<String> taskList = new JList<>(eventListModel);
-        taskList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        taskList.setLayoutOrientation(JList.VERTICAL);
-        taskList.setVisibleRowCount(-1); // Display all rows
-        JScrollPane scrollPane = new JScrollPane(taskList);
-        scrollPane.setPreferredSize(new Dimension(200, 100));
-        JLabel taskLabel = new JLabel("Upcoming Tasks");
-
-        // --- Center column (logo, label, button) ---
-        JPanel centerPanel = new JPanel();
-        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
-        centerPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        centerPanel.add(imageLabel);
-        centerPanel.add(Box.createVerticalStrut(10));
-        centerPanel.add(homeLabel);
-        centerPanel.add(Box.createVerticalStrut(10));
-        centerPanel.add(goToCalendarButton);
-
-        //login, register and delete Panel and button (SHIBUYA)
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-        buttonPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        loginButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        registerButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-        deleteUserButton.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        buttonPanel.add(Box.createVerticalStrut(10));
-        buttonPanel.add(loginButton);
-        buttonPanel.add(Box.createVerticalStrut(10));
-        buttonPanel.add(registerButton);
-        buttonPanel.add(Box.createVerticalStrut(10));
-        buttonPanel.add(deleteUserButton);
-
-        centerPanel.add(Box.createVerticalStrut(10));
-        centerPanel.add(buttonPanel);
-
-
-        c.insets = new Insets(20, 20, 20, 20);
-        c.gridx = 0;
-        c.gridy = 0;
-        c.anchor = GridBagConstraints.CENTER;
-        homePanel.add(centerPanel, c);
-
-
-        // --- Right-aligned task list ---
-        JPanel taskPanel = new JPanel();
-        taskPanel.setLayout(new BoxLayout(taskPanel, BoxLayout.Y_AXIS));
-        taskLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        scrollPane.setAlignmentX(Component.CENTER_ALIGNMENT);
-        taskPanel.add(taskLabel);
-        taskPanel.add(Box.createVerticalStrut(5));
-        taskPanel.add(scrollPane);
-
-        c.gridx = 1;
-        c.gridy = 0;
-        c.anchor = GridBagConstraints.CENTER;
-        homePanel.add(taskPanel, c);
-
-        return homePanel;
-    }
-
-
-    private JPanel createCalendarPanel() {
-        JPanel calendarPage = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5);
-
         Calendar calendar = Calendar.getInstance();
         currentYear = calendar.get(Calendar.YEAR);
         currentMonth = calendar.get(Calendar.MONTH);
 
-        JPanel headerPanel = new JPanel(new GridBagLayout());
-
-        JButton prevButton = new JButton("<");
-        JButton nextButton = new JButton(">");
-        JButton logoutButton = new JButton("Logout");
-        JButton homeButton = new JButton("Home");
-
-        //AYDAN - APR 23
-        monthLabel = new JLabel("Month");
-
-        // Add components to header panel
-        GridBagConstraints headerGbc = new GridBagConstraints();
-        headerGbc.insets = new Insets(5, 5, 5, 5);
-
-        String[] menuOptions = {"Menu", "Create Class","Manage Class", "Manage Events", "Logout", "Home"};
-        JComboBox<String> menuDropdown = new JComboBox<>(menuOptions);
-
-// Optional: make it look nicer
-        menuDropdown.setPreferredSize(new Dimension(120, 30));
-
-// Add action listener
-        menuDropdown.addActionListener(e -> {
-            String selected = (String) menuDropdown.getSelectedItem();
-            if (selected == null) return;
-
-            switch (selected) {
-                case "Create Class":
-                    createClass();
-                    break;
-                case "Logout":
-                    isLoggedIn = false;
-                    currentUsername = null;
-                    goToCalendarButton.setEnabled(false);
-                    loginButton.setEnabled(true);
-                    eventListModel.clear();
-                    cardLayout.show(mainPanel, "Home");
-                    break;
-                case "Home":
-                    cardLayout.show(mainPanel, "Home");
-                    break;
-                case "Manage Class":
-                    classManager.openModifyClassWindow();
-                    break;
-                case "Manage Events":
-                    openModifyEventWindow();
-                    break;
-                default:
-                    break;
-            }
-
-            // Reset dropdown back to "Menu" after action
-            menuDropdown.setSelectedIndex(0);
-        });
-
-        // Mini-panel for dropdown
-        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        leftPanel.add(menuDropdown);
-
-// Mini-panel for month navigation
-        JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
-        centerPanel.add(prevButton);
-        centerPanel.add(monthLabel);
-        centerPanel.add(nextButton);
-
-// Now add to headerPanel
-
-// LEFT PANEL (menuDropdown)
-        headerGbc.gridx = 0;
-        headerGbc.gridy = 0;
-        headerGbc.weightx = 0;
-        headerGbc.anchor = GridBagConstraints.WEST;
-        headerPanel.add(leftPanel, headerGbc);
-
-// CENTER PANEL (prev, monthLabel, next)
-        headerGbc.gridx = 1;
-        headerGbc.gridy = 0;
-        headerGbc.weightx = 0;
-        headerGbc.anchor = GridBagConstraints.CENTER;
-        headerPanel.add(centerPanel, headerGbc);
-
-
-
-
-        // Calendar Panel
-        calendarPanel = new JPanel(new GridLayout(0, 7, 5, 5));
-        calendarPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        calendarPanel.setBackground(Color.WHITE);
-
-        updateCalendar(currentYear, currentMonth);
-
-        // Button Listeners
-        prevButton.addActionListener(e -> changeMonth(-1));
-        nextButton.addActionListener(e -> changeMonth(1));
-        homeButton.addActionListener(e -> cardLayout.show(mainPanel, "Home"));
-
-        //AYDAN - APR 23
-
-
-        //logout (SHIBUYA
-        logoutButton.addActionListener(e -> {
-            isLoggedIn = false;
-            currentUsername = null;  // Optional: clear username reference
-
-            goToCalendarButton.setEnabled(false);
-            loginButton.setEnabled(true);
-            // Clear the upcoming task list from UI
-            eventListModel.clear();  // this resets the JList on Home panel
-
-            cardLayout.show(mainPanel, "Home");
-        });
-
-        // Layout for Calendar Page
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        calendarPage.add(headerPanel, gbc);
-
-        gbc.gridy = 1;
-        gbc.weighty = 1;
-        gbc.fill = GridBagConstraints.BOTH;
-        calendarPage.add(calendarPanel, gbc);
-
-        return calendarPage;
     }
+
+
 
 
     //AYDAN - APR 23
@@ -483,7 +213,7 @@ public class CalendarEditor extends JFrame {
 
 
 
-    private void updateCalendar(int year, int month) {
+    public void updateCalendar(int year, int month) {
         calendarPanel.removeAll();
         calendarPanel.setLayout(new GridLayout(0, 7, 1, 1));
 
@@ -551,7 +281,6 @@ public class CalendarEditor extends JFrame {
             topRightPanel.setOpaque(false);
             topRightPanel.add(addButton);
 
-            // ---- Optional Calendar Icon for Event Days ----
             if (hasEvents) {
                 JLabel iconLabel = new JLabel("📅", SwingConstants.CENTER);
                 iconLabel.setFont(new Font("Arial", Font.PLAIN, 12));
@@ -569,12 +298,10 @@ public class CalendarEditor extends JFrame {
     }
 
     private void createClass() {
-        Color[] colors = {Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.ORANGE, Color.cyan, Color.magenta, Color.PINK};
-        String[] ColorNames = {"Red", "Green", "Blue", "Yellow", "Orange", "Cyan", "Magenta", "Pink"};
         JTextField nameField = new JTextField(15);
         JTextField instructorTextField = new JTextField(15);
         JTextField locationTextField = new JTextField(15);
-        JComboBox<Color> colorBox = new JComboBox<>(colors);        JPanel panel = new JPanel(new GridLayout(0,1));
+        JPanel panel = new JPanel(new GridLayout(0,1));
 
 
 
@@ -584,8 +311,6 @@ public class CalendarEditor extends JFrame {
         panel.add(instructorTextField);
         panel.add(new JLabel("Room #: "));
         panel.add(locationTextField);
-        panel.add(new JLabel("Color: "));
-        panel.add(colorBox, BorderLayout.CENTER);
 
 
         int result = JOptionPane.showConfirmDialog(
@@ -638,11 +363,11 @@ public class CalendarEditor extends JFrame {
     }
 
 
-    private void updateTaskList() {
+    public void updateTaskList() {
         // read from firebase
 
         if (currentUsername == null || currentUsername.isEmpty()) {
-            System.out.println("❗ currentUsername is null. Skipping task list update.");
+            System.out.println("currentUsername is null. Skipping task list update.");
             return;
         }
 
@@ -738,15 +463,6 @@ public class CalendarEditor extends JFrame {
                 updateCalendar(currentYear, currentMonth);
                 updateTaskList();
 
-                // //firebase Shibuya　save event and upcoming
-                // FirebaseUserService.saveEvent(currentUsername, newEvent);
-                // FirebaseUserService.saveUpcomingTask(currentUsername, newEvent);
-
-
-                // events.computeIfAbsent(date.toString(), k -> new ArrayList<>()).add(newEvent);
-                // JOptionPane.showMessageDialog(null, "Event added successfully!");
-                // updateCalendar(currentYear, currentMonth);
-                // updateTaskList();
             } catch (DateTimeParseException e) {
                 JOptionPane.showMessageDialog(null, "Invalid time format. Please use HH:mm.", "Error", JOptionPane.ERROR_MESSAGE);
             }
@@ -769,7 +485,7 @@ public class CalendarEditor extends JFrame {
 
     public static void main(String[] args) {
         FirebaseSetup.initialize();  //firebase
-        //  FirebaseUserService.saveUser("CS370", "7");
+        //FirebaseUserService.saveUser("CS370", "7");
         SwingUtilities.invokeLater(() -> {
             CalendarEditor frame = new CalendarEditor();
             frame.setVisible(true);
@@ -777,4 +493,104 @@ public class CalendarEditor extends JFrame {
             frame.setLocationRelativeTo(null);
         });
     }
+
+
+
+
+
+    @Override
+    public void onLoginButtonClicked() {
+        if (isLoggedIn) {
+            JOptionPane.showMessageDialog(null, "You are already logged in.");
+            return;
+        }
+
+        CalendarLogin.showLoginDialog(username -> {
+            isLoggedIn = true;
+            currentUsername = username;
+
+            goToCalendarButton.setEnabled(true);
+            loginButton.setEnabled(false);
+
+            classes.clear();
+            classManager = new ClassManager(this, classes, currentUsername);
+            classes.addAll(FirebaseUserService.loadClasses(username));
+
+            List<CalendarEvent> loadedEvents = FirebaseUserService.loadEvents(username, classes);
+            events.clear();
+            for (CalendarEvent event : loadedEvents) {
+                String key = event.getDate().toString();
+                events.computeIfAbsent(key, k -> new ArrayList<>()).add(event);
+            }
+
+            FirebaseUserService.loadUpcomingTasks(currentUsername, eventListModel);
+            updateCalendar(currentYear, currentMonth);
+            updateTaskList();
+
+            cardLayout.show(mainPanel, "Calendar");
+        });
+
+    }
+    @Override
+    public void onRegisterButtonClicked() {
+        CalendarLogin.showRegisterDialog();
+    }
+    @Override
+    public void onDeleteUserButtonClicked() {
+        CalendarLogin.showDeleteUserDialog();
+    }
+    @Override
+    public void onCalendarButtonClicked() {
+        if (isLoggedIn) {
+            cardLayout.show(mainPanel, "Calendar");
+        } else {
+            JOptionPane.showMessageDialog(null, "Please log in first.");
+        }
+    }
+
+    @Override
+    public void onCreateClass() {
+        createClass();
+    }
+
+    @Override
+    public void onManageClass() {
+        classManager.openModifyClassWindow();
+    }
+
+    @Override
+    public void onManageEvents() {
+        openModifyEventWindow();
+    }
+
+    @Override
+    public void onLogout() {
+        isLoggedIn = false;
+        currentUsername = null;
+        goToCalendarButton.setEnabled(false);
+        loginButton.setEnabled(true);
+        eventListModel.clear();
+        cardLayout.show(mainPanel, "Home");
+    }
+
+    @Override
+    public void onHome() {
+        cardLayout.show(mainPanel, "Home");
+    }
+
+    @Override
+    public void onChangeMonth(int delta) {
+        changeMonth(delta);
+    }
+
+    @Override
+    public void updateCalendar(JPanel calendarPanel, JLabel monthLabel) {
+        this.calendarPanel = calendarPanel;
+        this.monthLabel = monthLabel;
+        updateCalendar(currentYear, currentMonth);
+    }
 }
+
+
+
+
